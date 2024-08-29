@@ -1,0 +1,89 @@
+role device (DEV:agent, KM:agent,	
+	H,H4B:hash_func,
+	D,ND,NWS:text,
+	SND, RCV:channel (dy))
+played_by DEV
+def=
+local State:nat,  
+Nonce, HM, HM1, HNWS, HND:message
+
+	const
+sec_1, sec_2, auth_dev_km_hm1: protocol_id
+
+init State:=0
+
+transition
+
+1. State=0 /\ RCV(start)=|> 
+State':=1 /\D':=new()
+/\HNWS':=H(NWS)
+/\HND':=H4B(ND)
+/\Nonce':=new()
+/\HM':=H4B(NWS.ND.Nonce'.D')
+/\SND(HNWS'.HND'.Nonce'.HM'.D')
+/\secret(NWS,sec_1,{DEV,KM})
+/\secret(ND,sec_2,{DEV,KM})
+%%/\witness(DEV,KM,auth_dev_km_hm1,HM')
+
+end role
+
+
+role keymanager (KM,DEV:agent,
+	H,H4B:hash_func,
+	D,ND,NWS:text,
+	SND,RCV:channel (dy))
+played_by KM
+
+def=
+local State:nat,
+Nonce, HM, HM1, HNWS, HND:message
+
+	const
+sec_1, sec_2, auth_dev_km_hm1: protocol_id
+
+init State:=0
+transition
+
+1. State=0/\RCV(HNWS'.HND'.Nonce'.HM'.D')=|>
+State':=1 /\ HM1':=H4B(NWS.ND.Nonce'.D')
+%%/\request(DEV,KM,auth_dev_km_hm1,HM1')
+
+end role
+
+
+role session(DEV:agent,KM:agent,
+	H,H4B:hash_func,
+	D,ND,NWS:text)
+
+def=
+local SND1,RCV1,SND2,RCV2,SND3,RCV3:channel(dy)
+	composition
+device (DEV,KM,H,H4B,D,ND,NWS,SND1,RCV1)
+/\keymanager (KM,DEV,H,H4B,D,ND,NWS,SND2,RCV2)
+
+end role
+
+role environment()
+def=
+	const
+	dev,km:agent,
+	h,h4b:hash_func,
+	d,nd,nws:text,
+	nonce, hm, hm1, hnws, hnd : message,
+	sec_1, sec_2, auth_dev_km_hm1: protocol_id
+
+	intruder_knowledge = {dev, km, nonce, hm, hm1, hnws, hnd, d}
+
+	composition
+		session(dev,km,h,h4b,d,nd,nws)
+		/\ session(km,dev,h,h4b,d,nd,nws) 
+		
+
+end role
+
+goal
+	secrecy_of sec_1
+	secrecy_of sec_2
+	%%authentication_on auth_dev_km_hm1
+end goal
+environment()
